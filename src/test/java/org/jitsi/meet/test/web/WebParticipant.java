@@ -26,6 +26,7 @@ import org.openqa.selenium.interactions.*;
 import org.openqa.selenium.remote.*;
 import org.openqa.selenium.support.ui.*;
 
+import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.logging.*;
@@ -38,11 +39,6 @@ public class WebParticipant extends Participant<WebDriver>
     implements JavascriptExecutor
 {
     /**
-     * Temporary added to be able to test Plan-B till it is completely dropped from Chrome.
-     */
-    private static final boolean DISABLE_UNIFIED = Boolean.getBoolean("jitsi-meet-torture.disable.unified");
-
-    /**
      * Default config for Web participants.
      */
     public static final String DEFAULT_CONFIG
@@ -53,12 +49,11 @@ public class WebParticipant extends Participant<WebDriver>
             + "&config.disableNS=true"
             + "&config.enableTalkWhileMuted=false"
             + "&config.callStatsID=false"
-            + "&config.alwaysVisibleToolbar=true"
+            + "&config.toolbarConfig.alwaysVisible=true"
             + "&config.p2p.enabled=false"
             + "&config.p2p.useStunTurn=false"
             + "&config.pcStatsInterval=1500"
             + "&config.prejoinConfig.enabled=false"
-            + (DISABLE_UNIFIED ? "&config.p2p.enableUnifiedOnChrome=false&config.enableUnifiedOnChrome=false" : "")
             + "&config.gatherStats=true"
             + "&config.disable1On1Mode=true"
             + "&config.analytics.disabled=true"
@@ -110,6 +105,7 @@ public class WebParticipant extends Participant<WebDriver>
     private AVModerationMenu avModerationMenu;
     private BreakoutRoomsList breakoutRoomsList;
     private DialInNumbersPage dialInNumbersPage;
+    private Dialogs dialogs;
     private InviteDialog inviteDialog;
     private LargeVideo largeVideo;
     private LobbyScreen lobbyScreen;
@@ -122,6 +118,7 @@ public class WebParticipant extends Participant<WebDriver>
     private WebFilmstrip filmstrip;
 
     private final boolean isLoadTest;
+    private final boolean saveLogs;
 
     /**
      * Constructs a Participant.
@@ -129,19 +126,22 @@ public class WebParticipant extends Participant<WebDriver>
      * @param name    the name.
      * @param driver  its driver instance.
      * @param type    the type (type of browser).
+     * @param isLoadTest is this a load test participant.
+     * @param saveLogs is save logs on hangup enabled.
      */
     public WebParticipant(
-            String name, WebDriver driver, ParticipantType type, boolean isLoadTest)
+            String name, WebDriver driver, ParticipantType type, boolean isLoadTest, boolean saveLogs)
     {
         super(name, driver, type, DEFAULT_CONFIG);
         this.isLoadTest = isLoadTest;
+        this.saveLogs = saveLogs;
     }
 
     public String getBridgeIp()
     {
         // With the default stats interval (10s) this can take up to 20 seconds.
         // We wait for 30 to give ourselves some margin.
-        return new WebDriverWait(driver, 30).until(d -> {
+        return new WebDriverWait(driver, Duration.ofSeconds(30)).until(d -> {
 
             RtpStatistics rtpStats
                 = new WebRtpStatistics((JavascriptExecutor) d);
@@ -199,7 +199,8 @@ public class WebParticipant extends Participant<WebDriver>
         // then check for id='showMore' and click it
         try
         {
-            executeScript("window.APP === undefined && document.getElementById('showMore').click();");
+            executeScript("window.APP === undefined && document.getElementById('showMore')" +
+                              " && document.getElementById('showMore').click();");
         }
         catch(Exception e)
         {
@@ -210,7 +211,7 @@ public class WebParticipant extends Participant<WebDriver>
         {
             // let's wait for loading and switch to that iframe so we can continue
             // with regular tests
-            WebDriverWait wait = new WebDriverWait(driver, 60);
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(60));
             wait.until(ExpectedConditions.frameToBeAvailableAndSwitchToIt(
                 By.id(conferenceUrl.getIframeToNavigateTo())));
         }
@@ -266,17 +267,26 @@ public class WebParticipant extends Participant<WebDriver>
     @Override
     protected void doHangUp()
     {
+        if (this.saveLogs)
+        {
+            FailureListener.saveBrowserLogs("on-hangup", this);
+        }
+
         if (!isLoadTest)
         {
             try
             {
-                getToolbar().clickHangUpButton();
+                // we use here the command instead of toolbar button as toolbar button causes a redirect
+                // on some deployments and that with combination of iframe can cause some issue when navigating after
+                // that to about:blank. We were seeing 504 gateway timeout errors between hub and nodes.
+                executeScript("APP.conference.leaveRoom(true);");
             }
             catch(Exception e)
             {
-                // there are cases where the toolbar is not available as we had already hanged up
+                // there are cases where we had already hanged up
             }
 
+            // wait here to make sure the command above has finished
             TestUtils.waitMillis(500);
         }
         // open a blank page after hanging up, to make sure
@@ -677,6 +687,20 @@ public class WebParticipant extends Participant<WebDriver>
         }
 
         return lobbyScreen;
+    }
+
+
+    /**
+     * @return a representation of the dialogs.
+     */
+    public Dialogs getDialogs()
+    {
+        if (dialogs == null)
+        {
+            dialogs = new Dialogs(this);
+        }
+
+        return dialogs;
     }
 
     /**

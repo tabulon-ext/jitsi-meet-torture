@@ -6,7 +6,6 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.interactions.Actions;
 
 import java.util.*;
-import java.util.logging.*;
 
 import static org.testng.Assert.fail;
 
@@ -21,7 +20,7 @@ public class ParticipantsPane
      * Accessibility labels to be used as selectors for finding WebElements
      * within the {@link ParticipantsPane}.
      */
-    private final static String INVITE = "Invite Someone";
+    private final static String INVITE = "Invite someone";
 
     /**
      * The ID of the context menu button.
@@ -154,11 +153,11 @@ public class ParticipantsPane
         hoverOnMeetingParticipantListItem.perform();
 
 
-        if (fromContextMenu) 
+        if (fromContextMenu)
         {
             clickAskToUnmuteContextMenuById(participantToUnmute);
         }
-        else 
+        else
         {
             clickAskToUnmuteQuickActionButtonById(participantToUnmute);
         }
@@ -180,11 +179,11 @@ public class ParticipantsPane
         hoverOnMeetingParticipantListItem.moveToElement(meetingParticipantListItem);
         hoverOnMeetingParticipantListItem.perform();
 
-        if (fromContextMenu) 
+        if (fromContextMenu)
         {
             clickAllowVideoContextMenuById(participantToUnmute);
         }
-        else 
+        else
         {
             clickAllowVideoQuickActionButtonById(participantToUnmute);
         }
@@ -249,6 +248,9 @@ public class ParticipantsPane
             participant.getDriver(),
             By.cssSelector(moreButtonSelector),
             2);
+        // a debug for an error MoveTargetOutOfBoundsException: move target out of bounds
+        TestUtils.print("More options element for " + remoteParticipantEndpointId
+            + "is at:" + meetingParticipantMoreOptions.getLocation());
         Actions clickContextMenu = new Actions(participant.getDriver());
         clickContextMenu.moveToElement(meetingParticipantMoreOptions);
         clickContextMenu.perform();
@@ -415,7 +417,7 @@ public class ParticipantsPane
      *
      * @param remoteId id the participant for which to open the menu
      */
-    private void openParticipantContextMenu(String remoteId)
+    private void openParticipantContextMenu(String remoteId, boolean retry)
     {
         WebElement listItem = TestUtils.waitForElementBy(participant.getDriver(),
                 By.xpath("//div[@id='participant-item-" + remoteId + "']"), 5);
@@ -424,8 +426,27 @@ public class ParticipantsPane
         hoverOnParticipantListItem.moveToElement(listItem);
         hoverOnParticipantListItem.perform();
 
-        String cssSelector = MeetUIUtils.getAccessibilityCSSSelector(PARTICIPANT_MORE_LABEL);
-        listItem.findElement(By.cssSelector(cssSelector)).click();
+        try
+        {
+            String cssSelector = MeetUIUtils.getAccessibilityCSSSelector(PARTICIPANT_MORE_LABEL);
+            listItem.findElement(By.cssSelector(cssSelector)).click();
+        }
+        catch (ElementNotInteractableException e)
+        {
+            if (retry)
+            {
+                throw e;
+            }
+
+            // workaround of exception we sometimes see
+            // let's move the mous to local video and then back try the context menu
+            WebElement toolbar = participant.getDriver().findElement(By.id("localVideoContainer"));
+            Actions hoverOnToolbar = new Actions(participant.getDriver());
+            hoverOnToolbar.moveToElement(toolbar);
+            hoverOnToolbar.perform();
+
+            openParticipantContextMenu(remoteId, true);
+        }
     }
 
     /**
@@ -438,7 +459,7 @@ public class ParticipantsPane
     {
         String remoteParticipantId = participantToSend.getEndpointId();
 
-        openParticipantContextMenu(remoteParticipantId);
+        openParticipantContextMenu(remoteParticipantId, false);
 
         String cssSelector = MeetUIUtils.getAccessibilityCSSSelector(roomName);
         WebElement sendButton = TestUtils.waitForElementBy(participant.getDriver(),
@@ -460,7 +481,7 @@ public class ParticipantsPane
      */
     public void close()
     {
-        participant.getToolbar().clickParticipantsButton();
+        participant.getToolbar().clickCloseParticipantsButton();
         waitForHidden();
     }
 

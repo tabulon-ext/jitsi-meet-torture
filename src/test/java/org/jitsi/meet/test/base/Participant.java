@@ -24,6 +24,7 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.*;
 
 import java.io.*;
+import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
@@ -39,7 +40,7 @@ public abstract class Participant<T extends WebDriver>
      * The seconds between calls that will make sure we keep alive the
      * webdriver session.
      */
-    private static final int KEEP_ALIVE_SESSION_INTERVAL = 20;
+    private static final int KEEP_ALIVE_SESSION_INTERVAL = 10;
 
     /**
      * The default config which will be set on the {@link JitsiMeetUrl}, before
@@ -117,15 +118,6 @@ public abstract class Participant<T extends WebDriver>
     public void initialize()
     {
         startKeepAliveExecution();
-    }
-
-    /**
-     * Joins a conference.
-     * @param roomName the room name to join.
-     */
-    public void joinConference(String roomName)
-    {
-        this.joinConference(new JitsiMeetUrl().setRoomName(roomName));
     }
 
     /**
@@ -499,10 +491,10 @@ public abstract class Participant<T extends WebDriver>
     {
         try
         {
-            if (getMeetUrl().getIframeToNavigateTo() != null)
+            if (getMeetUrl() != null && getMeetUrl().getIframeToNavigateTo() != null)
             {
                 // let's wait for switch to that iframe, so we can save the correct page
-                WebDriverWait wait = new WebDriverWait(driver, 60);
+                WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(60));
                 wait.until(ExpectedConditions.frameToBeAvailableAndSwitchToIt(
                     By.id(getMeetUrl().getIframeToNavigateTo())));
             }

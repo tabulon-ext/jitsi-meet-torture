@@ -15,13 +15,13 @@
  */
 package org.jitsi.meet.test.util;
 
-import org.jitsi.meet.test.pageobjects.web.ParticipantsPane;
 import org.jitsi.meet.test.web.*;
 import org.openqa.selenium.*;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.interactions.*;
 import org.openqa.selenium.support.ui.*;
 
+import java.time.*;
 import java.util.*;
 
 import static org.testng.Assert.*;
@@ -45,6 +45,13 @@ public class MeetUIUtils
      * ID can be `localVideoContainer` or "participant_" + participantEndpointId.
      */
     private static String AVATAR_XPATH_TMPL = "//span[@id='%s']//img[contains(@class,'userAvatar')]";
+
+    /**
+     * The string template for finding thumbnail default avatar by id using xpath.
+     * ID can be `localVideoContainer` or "participant_" + participantEndpointId.
+     */
+    private static String DEFAULT_AVATAR_XPATH_TMPL
+        = "//span[@id='%s']//div[contains(@class,'userAvatar') and contains(@class, 'defaultAvatar')]";
 
     /**
      * Check if on the large video there is "grey" avatar displayed and if not
@@ -572,9 +579,27 @@ public class MeetUIUtils
     public static void assertAvatarDisplayed(
             WebDriver driver, String endpointId)
     {
+        assertAvatarDisplayed(driver, endpointId, false);
+    }
+
+    /**
+     * Makes sure that a user's avatar is displayed, and that the user's video
+     * is not displayed. Allows for the these conditions to not hold
+     * immediately, but within a time interval of 5 seconds.
+     * @param driver instance of <tt>WebDriver</tt> on which we'll perform
+     * the verification.
+     * @param endpointId the resource part of MUC JID which identifies user's
+     * video thumbnail.
+     */
+    public static void assertAvatarDisplayed(
+            WebDriver driver, String endpointId, boolean defaultAvatar)
+    {
+        String xpath = defaultAvatar
+            ? MeetUIUtils.getDefaultAvatarXpathForParticipant(endpointId)
+            : MeetUIUtils.getAvatarXpathForParticipant(endpointId);
         // Avatar image
         TestUtils.waitForDisplayedElementByXPath(
-            driver, MeetUIUtils.getAvatarXpathForParticipant(endpointId),
+                driver, xpath,
             5);
 
         // User's video if available should be hidden, the element is missing
@@ -618,7 +643,7 @@ public class MeetUIUtils
      */
     public static String getAccessibilityCSSSelector(String accessibilityLabel)
     {
-        return String.format("[aria-label=\"%s\"]", accessibilityLabel);
+        return String.format("[aria-label^=\"%s\"]", accessibilityLabel);
     }
 
     /**
@@ -713,6 +738,22 @@ public class MeetUIUtils
     }
 
     /**
+     * Makes sure that the default avatar is displayed in the local thumbnail and that
+     * the video is not displayed.
+     * @param driver the instance of <tt>WebDriver</tt> on which we'll
+     * perform the verification.
+     */
+    public static void assertLocalThumbnailShowsDefaultAvatar(WebDriver driver)
+    {
+        TestUtils.waitForDisplayedElementByXPath(
+                driver,
+                MeetUIUtils.getDefaultAvatarXpathForLocal(),
+                5);
+        TestUtils.waitForElementNotPresentOrNotDisplayedByXPath(
+                driver, "//span[@id='localVideoWrapper']//video", 5);
+    }
+
+    /**
      * Returns the source of the large video currently shown.
      * @return the source of the large video currently shown.
      */
@@ -763,7 +804,7 @@ public class MeetUIUtils
     public static List<WebElement> getThumbnails(WebDriver participant)
     {
         return participant.findElements(By.xpath(
-            "//div[@id='remoteVideos']/span[contains(@class,'videocontainer')]"));
+            "//div[@id='remoteVideos']//span[contains(@class,'videocontainer')]"));
     }
 
     /**
@@ -914,7 +955,7 @@ public class MeetUIUtils
         WebDriver driver,
         final String expectedVideoSrc)
     {
-        new WebDriverWait(driver, 3)
+        new WebDriverWait(driver, Duration.ofSeconds(3))
             .withMessage(
                     "Failed to switch the large video at: "
                         + MeetUtils.getResourceJid(driver)
@@ -1026,6 +1067,24 @@ public class MeetUIUtils
         TestUtils.waitForBoolean(driver,
             "return " + (received ? "" : "!" ) +"JitsiMeetJS.app.testing.isRemoteVideoReceived('" + endpointId + "');",
             10);
+
+        // Wait for the remote video to be rendered
+        TestUtils.waitForCondition(
+            driver,
+            10,
+            (ExpectedCondition<Boolean>) d ->
+            {
+                WebElement videoElement
+                    = driver.findElement(By.xpath("//span[@id='participant_" + endpointId + "']"));
+
+                if (videoElement == null)
+                {
+                    return false;
+                }
+                boolean currentDisplay = videoElement.getAttribute("class").contains("display-video");
+
+                return currentDisplay == received;
+            });
     }
 
     /**
@@ -1162,11 +1221,11 @@ public class MeetUIUtils
     {
         participant.getParticipantsPane().assertIsParticipantVideoMuted(participant, true);
 
-        // Make sure that there is the video mute button
-        participant.getToolbar().waitForVideoMuteButtonDisplay();
+        // Make sure that there is the video unmute button
+        participant.getToolbar().waitForVideoUnmuteButtonDisplay();
 
-        // Mute participant's video
-        participant.getToolbar().clickVideoMuteButton();
+        // Unmute participant's video
+        participant.getToolbar().clickVideoUnmuteButton();
 
         // Check if local video muted icon disappeared
         participant.getParticipantsPane().assertIsParticipantVideoMuted(participant, false);
@@ -1178,70 +1237,71 @@ public class MeetUIUtils
     }
 
     /**
-     * Toggles mute/unmute <tt>participant</tt>'s video, checks if the local UI has been
-     * updated accordingly and then does the verification from
-     * the <tt>participantCheck</tt> perspective.
-     * @param participant the {@link WebParticipant} of the participant to be
-     * "video unmuted"
-     * @param participantCheck the {@link WebParticipant} of the participant
-     * which observes and checks if the video has been unmuted correctly.
-     * @param isMuted the {@link Boolean} of the participant
-     * which checks if the audio is muted.
-     */
-    public static void toggleVideoAndCheck(WebParticipant participant,
-                                           WebParticipant participantCheck,
-                                           Boolean isMuted)
-    {
-        WebDriver driver = participant.getDriver();
-
-        // Make sure that there is the audio mute button
-        participant.getToolbar().waitForVideoMuteButtonDisplay();
-
-        // Toggle participant's video
-        participant.getToolbar().clickVideoMuteButton();
-
-        // Check local video muted icon state
-        participant.getParticipantsPane().assertIsParticipantVideoMuted(participant, isMuted);
-
-        if (participantCheck != null)
-        {
-            participantCheck.getParticipantsPane().assertIsParticipantVideoMuted(participant, isMuted);
-        }
-    }
-
-    /**
-     * Toggles mute/unmute <tt>participant</tt>'s audio, checks if the local UI has been
+     * Unmute <tt>participant</tt>'s audio, checks if the local UI has been
      * updated accordingly and then does the verification from
      * the <tt>participantCheck</tt> perspective.
      * @param participant the {@link WebParticipant} of the participant to be
      * "audio unmuted"
      * @param participantCheck the {@link WebParticipant} of the participant
      * which observes and checks if the audio has been unmuted correctly.
-     * @param isMuted the {@link Boolean} of the participant
-     * which checks if the audio is muted.
      */
-    public static void toggleAudioAndCheck(WebParticipant participant,
-                                           WebParticipant participantCheck,
-                                           Boolean isMuted)
+    public static void unmuteAudioAndCheck(WebParticipant participant,
+                                           WebParticipant participantCheck)
     {
+        participant.getNotifications().closeAskToUnmuteNotification();
+
         WebDriver driver = participant.getDriver();
 
-        // Make sure that there is the audio mute button
-        participant.getToolbar().waitForAudioMuteButtonDisplay();
+        // Make sure that there is the audio unmute button
+        participant.getToolbar().waitForAudioUnmuteButtonDisplay();
 
-        // Toggle participant's audio
-        participant.getToolbar().clickAudioMuteButton();
+        // Unmute participant's audio
+        participant.getToolbar().clickAudioUnmuteButton();
 
-        // Check local audio muted icon state
+        // Check local audio has no muted icon
         assertMuteIconIsDisplayed(
-                driver, driver, isMuted, participant.getName());
+                driver, driver, false, participant.getName());
 
         if (participantCheck != null)
         {
             MeetUIUtils.assertMuteIconIsDisplayed(
                     participantCheck.getDriver(),
                     driver,
-                    isMuted,
+                    false,
+                    "");
+        }
+    }
+
+    /**
+     * Mute <tt>participant</tt>'s audio, checks if the local UI has been
+     * updated accordingly and then does the verification from
+     * the <tt>participantCheck</tt> perspective.
+     * @param participant the {@link WebParticipant} of the participant to be
+     * "audio muted"
+     * @param participantCheck the {@link WebParticipant} of the participant
+     * which observes and checks if the audio has been muted correctly.
+     */
+    public static void muteAudioAndCheck(WebParticipant participant,
+                                           WebParticipant participantCheck)
+    {
+        WebDriver driver = participant.getDriver();
+
+        // Make sure that there is the audio mute button
+        participant.getToolbar().waitForAudioMuteButtonDisplay();
+
+        // Mute participant's audio
+        participant.getToolbar().clickAudioMuteButton();
+
+        // Check local audio muted icon state
+        assertMuteIconIsDisplayed(
+                driver, driver, true, participant.getName());
+
+        if (participantCheck != null)
+        {
+            MeetUIUtils.assertMuteIconIsDisplayed(
+                    participantCheck.getDriver(),
+                    driver,
+                    true,
                     "");
         }
     }
@@ -1282,11 +1342,30 @@ public class MeetUIUtils
     }
 
     /**
+     * The xpath for the default participant avatar.
+     * @param endpointId the endpoint Id.
+     * @return the xpath.
+     */
+    public static String getDefaultAvatarXpathForParticipant(String endpointId)
+    {
+        return String.format(DEFAULT_AVATAR_XPATH_TMPL, "participant_" + endpointId);
+    }
+
+    /**
      * The xpath for the local participant avatar.
      * @return the xpath.
      */
     public static String getAvatarXpathForLocal()
     {
         return String.format(AVATAR_XPATH_TMPL, "localVideoContainer");
+    }
+
+    /**
+     * The xpath for the local participant avatar.
+     * @return the xpath.
+     */
+    public static String getDefaultAvatarXpathForLocal()
+    {
+        return String.format(DEFAULT_AVATAR_XPATH_TMPL, "localVideoContainer");
     }
 }

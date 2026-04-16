@@ -56,6 +56,11 @@
             <class name="org.jitsi.meet.test.ConnectionTimeTest" />
         </classes>
     </test>-->
+    <test name="CodecSelectionTest">
+        <classes>
+            <class name="org.jitsi.meet.test.CodecSelectionTest" />
+        </classes>
+    </test>
     <test name="DataChannelTest">
         <classes>
             <class name="org.jitsi.meet.test.DataChannelTest" />
@@ -193,11 +198,11 @@
             <class name="org.jitsi.meet.test.ReloadTest" />
         </classes>
     </test>
-    <test name="SharedVideoTest">
+    <!-- <test name="SharedVideoTest">
         <classes>
             <class name="org.jitsi.meet.test.SharedVideoTest" />
         </classes>
-    </test>
+    </test> -->
     <test name="SingleModeratorTest">
         <classes>
             <class name="org.jitsi.meet.test.misc.SingleModeratorTest" />
@@ -216,6 +221,11 @@
     <test name="StopVideoTest">
         <classes>
             <class name="org.jitsi.meet.test.StopVideoTest" />
+        </classes>
+    </test>
+    <test name="SubjectTest">
+        <classes>
+            <class name="org.jitsi.meet.test.SubjectTest" />
         </classes>
     </test>
     <test name="SwitchVideoTest">

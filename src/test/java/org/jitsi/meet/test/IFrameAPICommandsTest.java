@@ -16,7 +16,6 @@
 package org.jitsi.meet.test;
 
 import com.google.gson.*;
-import org.jitsi.meet.test.base.*;
 import org.jitsi.meet.test.pageobjects.web.*;
 import org.jitsi.meet.test.util.*;
 import org.jitsi.meet.test.web.*;
@@ -46,6 +45,8 @@ public class IFrameAPICommandsTest
     public void setupClass()
     {
         super.setupClass();
+
+        checkIframeDisabled();
 
         checkModerationSupported();
     }
@@ -213,63 +214,65 @@ public class IFrameAPICommandsTest
     @Test(dependsOnMethods = {"testCommandToggleLobby"})
     public void testCommandStartStopShareVideo()
     {
+        // Currently most of the code of the test is commented temporary because of restrictions on the URLs we test
+        // with. Once a proper URL whitelist for shared video is implemented we should uncomment the code.
         hangUpAllParticipants();
 
-        this.iFrameUrl = getIFrameUrl(null, null);
-        ensureTwoParticipants(this.iFrameUrl, null);
+    //     this.iFrameUrl = getIFrameUrl(null, null);
+    //     ensureTwoParticipants(this.iFrameUrl, null);
 
-        WebParticipant participant1 = getParticipant1();
-        WebParticipant participant2 = getParticipant2();
-        WebDriver driver1 = participant1.getDriver();
-        WebDriver driver2 = participant2.getDriver();
+    //     WebParticipant participant1 = getParticipant1();
+    //     WebParticipant participant2 = getParticipant2();
+    //     WebDriver driver1 = participant1.getDriver();
+    //     WebDriver driver2 = participant2.getDriver();
 
-        switchToIframeAPI(driver1);
+    //     switchToIframeAPI(driver1);
 
-        TestUtils.executeScript(driver1,
-            "window.jitsiAPI.executeCommand('startShareVideo', '" + SharedVideoTest.V2_LINK + "');");
+    //     TestUtils.executeScript(driver1,
+    //         "window.jitsiAPI.executeCommand('startShareVideo', '" + SharedVideoTest.V2_LINK + "');");
 
-        switchToMeetContent(this.iFrameUrl, driver1);
+    //     switchToMeetContent(this.iFrameUrl, driver1);
 
-        TestUtils.waitForDisplayedElementByID(
-            driver1,
-            "sharedVideoPlayer",
-            10);
+    //     TestUtils.waitForDisplayedElementByID(
+    //         driver1,
+    //         "sharedVideoPlayer",
+    //         10);
 
-        // Now let's check the second participant state
-        // make sure we are in meet, not in the frame
-        driver2.switchTo().defaultContent();
-        TestUtils.waitForDisplayedElementByID(
-            driver2,
-            "sharedVideoPlayer",
-            10);
+    //     // Now let's check the second participant state
+    //     // make sure we are in meet, not in the frame
+    //     driver2.switchTo().defaultContent();
+    //     TestUtils.waitForDisplayedElementByID(
+    //         driver2,
+    //         "sharedVideoPlayer",
+    //         10);
 
-        switchToIframeAPI(driver1);
+    //     switchToIframeAPI(driver1);
 
-        TestUtils.executeScript(driver1,
-            "window.jitsiAPI.executeCommand('stopShareVideo');");
+    //     TestUtils.executeScript(driver1,
+    //         "window.jitsiAPI.executeCommand('stopShareVideo');");
 
-        switchToMeetContent(this.iFrameUrl, driver1);
+    //     switchToMeetContent(this.iFrameUrl, driver1);
 
-        try
-        {
-            TestUtils.waitForNotDisplayedElementByID(
-                driver1, "sharedVideoPlayer", 5);
-        }
-        catch(StaleElementReferenceException ex)
-        {
-            // if the element is detached in a process of checking its display
-            // status, means it is not visible anymore
-        }
-        try
-        {
-            TestUtils.waitForNotDisplayedElementByID(
-                driver2, "sharedVideoPlayer", 5);
-        }
-        catch(StaleElementReferenceException ex)
-        {
-            // if the element is detached in a process of checking its display
-            // status, means it is not visible anymore
-        }
+    //     try
+    //     {
+    //         TestUtils.waitForNotDisplayedElementByID(
+    //             driver1, "sharedVideoPlayer", 5);
+    //     }
+    //     catch(StaleElementReferenceException ex)
+    //     {
+    //         // if the element is detached in a process of checking its display
+    //         // status, means it is not visible anymore
+    //     }
+    //     try
+    //     {
+    //         TestUtils.waitForNotDisplayedElementByID(
+    //             driver2, "sharedVideoPlayer", 5);
+    //     }
+    //     catch(StaleElementReferenceException ex)
+    //     {
+    //         // if the element is detached in a process of checking its display
+    //         // status, means it is not visible anymore
+    //     }
     }
 
     /**
@@ -515,9 +518,10 @@ public class IFrameAPICommandsTest
         switchToMeetContent(this.iFrameUrl, driver1);
 
         String raiseHandSelector = participant2.getToolbar().clickRaiseHandButton();
+        String lowerHandSelector = MeetUIUtils.getAccessibilityCSSSelector(Toolbar.LOWER_HAND);
 
         TestUtils.waitForCondition(driver2, 5, (ExpectedCondition<Boolean>) d ->
-            d.findElement(By.cssSelector(raiseHandSelector)).getAttribute("aria-pressed").equals("true"));
+            d.findElement(By.cssSelector(lowerHandSelector)).getAttribute("aria-pressed").equals("true"));
 
         TestUtils.waitForCondition(driver1, 5, (ExpectedCondition<Boolean>) d ->
             participant1.getNotifications().hasRaisedHandNotification());
@@ -538,7 +542,7 @@ public class IFrameAPICommandsTest
 
         switchToMeetContent(this.iFrameUrl, driver1);
 
-        participant2.getToolbar().clickRaiseHandButton();
+        participant2.getToolbar().clickLowerHandButton();
 
         try
         {
@@ -551,7 +555,7 @@ public class IFrameAPICommandsTest
 
             // We sometimes see that the second click (to lower the hand) is not propagated for some reason
             // So let's do a retry waiting for the UI to set that the button is not toggled anymore
-            participant2.getToolbar().clickRaiseHandButton();
+            participant2.getToolbar().clickLowerHandButton();
 
             TestUtils.waitForCondition(driver2, 5, (ExpectedCondition<Boolean>) d ->
                 d.findElement(By.cssSelector(raiseHandSelector)).getAttribute("aria-pressed").equals("false"));
@@ -1027,14 +1031,10 @@ public class IFrameAPICommandsTest
 
         participant1.waitForParticipants(0);
 
-        // check that the kicked participant sees the notification
+        // check that the kicked participant sees the kick reason dialog
         assertTrue(
-            getParticipant2().getNotifications().hasKickedNotification(),
-            "The second participant should see a warning that was kicked.");
-
-//        switchToIframeAPI(driver1);
-//         FIXME getEventResult(driver1, "participantKickedOut")
-//        switchToMeetContent(this.iFrameUrl, driver1);
+            getParticipant2().getDialogs().isLeaveReasonDialogOpen(),
+            "The second participant should see a dialog that states he was kicked.");
     }
 
     /**
@@ -1046,6 +1046,8 @@ public class IFrameAPICommandsTest
     @Test(dependsOnMethods = {"testCommandKickParticipant"})
     public void testCommandOverwriteConfig()
     {
+        hangUpAllParticipants();
+
         this.iFrameUrl = getIFrameUrl(null, null);
         ensureOneParticipant(this.iFrameUrl);
 
@@ -1104,8 +1106,8 @@ public class IFrameAPICommandsTest
 
         switchToMeetContent(this.iFrameUrl, driver1);
 
-        participant2.getToolbar().clickChatButton();
-        participant3.getToolbar().clickChatButton();
+        participant2.getToolbar().clickOpenChatButton();
+        participant3.getToolbar().clickOpenChatButton();
 
         String msgXpath = "//div[contains(@class,'chatmessage')]"
             + "//div[contains(@class,'messagecontent')]/div[contains(@class,'usermessage')]";
@@ -1281,21 +1283,9 @@ public class IFrameAPICommandsTest
 
         switchToMeetContent(this.iFrameUrl, driver1);
 
-        String virtualBackgroundDialogXpath = "//p[@id='dialog-title']";
-        String dialogTitle = "Virtual backgrounds";
+        String virtualBackgroundDialogXpath = "//div[@id='virtual-background-dialog']";
 
         TestUtils.waitForElementBy(driver1, By.xpath(virtualBackgroundDialogXpath), 2);
-
-        TestUtils.waitForCondition(driver1, 2, (ExpectedCondition<Boolean>) d -> {
-            try
-            {
-                return driver1.findElement(By.xpath(virtualBackgroundDialogXpath)).getText().equals(dialogTitle);
-            }
-            catch(StaleElementReferenceException e)
-            {
-                return false;
-            }
-        });
 
         switchToIframeAPI(driver1);
 
@@ -1367,48 +1357,47 @@ public class IFrameAPICommandsTest
         TestUtils.executeScript(driver1,
                 "window.jitsiAPI.isParticipantsPaneOpen()" +
                         ".then(res => window.jitsiAPI.test.isParticipantsPaneOpen1 = res);");
-        boolean isParticipantsPaneOpen = TestUtils.executeScriptAndReturnBoolean(driver1,
-                "return window.jitsiAPI.test.isParticipantsPaneOpen1;");
-
-        // checks both the function and the UI
-        assertFalse(isParticipantsPaneOpen);
+        TestUtils.waitForCondition(driver1, 2, (ExpectedCondition<Boolean>) d ->
+                TestUtils.executeScriptAndReturnBoolean(driver1,
+                        "return !window.jitsiAPI.test.isParticipantsPaneOpen1;"));
 
         switchToMeetContent(this.iFrameUrl, driver1);
         TestUtils.waitForCondition(driver1, 5, (ExpectedCondition<Boolean>) d ->
-                participantsPane.isOpen() == false);
+                !participantsPane.isOpen());
 
         // then executes the command to open it
         switchToIframeAPI(driver1);
         TestUtils.executeScript(driver1,
                 "window.jitsiAPI.executeCommand('toggleParticipantsPane', true);");
+        TestUtils.waitMillis(500);
 
         TestUtils.executeScript(driver1,
                 "window.jitsiAPI.isParticipantsPaneOpen()" +
                         ".then(res => window.jitsiAPI.test.isParticipantsPaneOpen2 = res);");
-        isParticipantsPaneOpen = TestUtils.executeScriptAndReturnBoolean(driver1,
-                "return window.jitsiAPI.test.isParticipantsPaneOpen2;");
-
-        assertTrue(isParticipantsPaneOpen);
+        TestUtils.waitForCondition(driver1, 2, (ExpectedCondition<Boolean>) d ->
+                TestUtils.executeScriptAndReturnBoolean(driver1,
+                        "return window.jitsiAPI.test.isParticipantsPaneOpen2;"));
 
         switchToMeetContent(this.iFrameUrl, driver1);
-        TestUtils.waitForCondition(driver1, 5, (ExpectedCondition<Boolean>) d ->
-                participantsPane.isOpen() == true);
+        TestUtils.waitForCondition(driver1, 2, (ExpectedCondition<Boolean>) d ->
+                participantsPane.isOpen());
 
         // executes the command to close it
         switchToIframeAPI(driver1);
         TestUtils.executeScript(driver1,
                 "window.jitsiAPI.executeCommand('toggleParticipantsPane', false);");
+        TestUtils.waitMillis(500);
+
         TestUtils.executeScript(driver1,
                 "window.jitsiAPI.isParticipantsPaneOpen()" +
                         ".then(res => window.jitsiAPI.test.isParticipantsPaneOpen2 = res);");
-        isParticipantsPaneOpen = TestUtils.executeScriptAndReturnBoolean(driver1,
-                "return window.jitsiAPI.test.isParticipantsPaneOpen2;");
-
-        assertFalse(isParticipantsPaneOpen);
+        TestUtils.waitForCondition(driver1, 2, (ExpectedCondition<Boolean>) d ->
+                TestUtils.executeScriptAndReturnBoolean(driver1,
+                        "return !window.jitsiAPI.test.isParticipantsPaneOpen2;"));
 
         switchToMeetContent(this.iFrameUrl, driver1);
         TestUtils.waitForCondition(driver1, 5, (ExpectedCondition<Boolean>) d ->
-                participantsPane.isOpen() == false);
+                !participantsPane.isOpen());
     }
 
     /**

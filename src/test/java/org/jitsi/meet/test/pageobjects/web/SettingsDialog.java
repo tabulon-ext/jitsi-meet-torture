@@ -5,6 +5,7 @@ import org.jitsi.meet.test.web.*;
 import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.*;
 
+import java.time.*;
 import java.util.*;
 
 public class SettingsDialog
@@ -29,7 +30,7 @@ public class SettingsDialog
     private final static String START_VIDEO_MUTED_CHECKBOX
         = "[name='start-video-muted']";
     private final static String X_PATH_MORE_TAB
-        =  "//div[contains(@class, 'settings-dialog')]//*[text()='More']";
+        =  "//div[contains(@class, 'settings-dialog')]//*[text()='General']";
     private final static String X_PATH_MODERATOR_TAB
         =  "//div[contains(@class, 'settings-dialog')]//*[text()='Moderator']";
     private final static String X_PATH_PROFILE_TAB
@@ -151,7 +152,7 @@ public class SettingsDialog
      */
     public void setHideSelfView(boolean enable)
     {
-        openProfileTab();
+        openMoreTab();
         setCheckbox(HIDE_SELF_VIEW_CHECKBOX, enable);
     }
 
@@ -226,7 +227,7 @@ public class SettingsDialog
         WebDriver driver = participant.getDriver();
 
         TestUtils.waitForElementBy(driver, By.xpath(xPathSelectorForTab), 5);
-        WebDriverWait wait = new WebDriverWait(driver, 10);
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
         WebElement element = wait.until(ExpectedConditions.elementToBeClickable(
             By.xpath(xPathSelectorForTab)));
 

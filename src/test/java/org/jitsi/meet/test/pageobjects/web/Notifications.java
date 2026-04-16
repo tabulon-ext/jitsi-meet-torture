@@ -76,18 +76,18 @@ public class Notifications
     /**
      * The test id of the button in the notification to approve access.
      */
-    private static final String LOBBY_PARTICIPANT_ADMIT_TEST_ID = "lobby.admit";
+    private static final String LOBBY_PARTICIPANT_ADMIT_TEST_ID = "participantsPane.actions.admit";
 
     /**
      * The test id of the button in the notification to reject access.
      */
-    private static final String LOBBY_PARTICIPANT_REJECT_TEST_ID = "lobby.reject";
+    private static final String LOBBY_PARTICIPANT_REJECT_TEST_ID = "participantsPane.actions.reject";
 
     /**
      * The xpath to find the notification for single knocking participant.
      */
     private static final String LOBBY_KNOCKING_PARTICIPANT_NOTIFICATION_XPATH
-        = "//div[@data-testid='notify.participantWantsToJoin']//div[not(contains(@class,'participant'))]/span";
+        = "//div[@data-testid='notify.participantWantsToJoin']/div/div/span";
 
     /**
      * The test id for the notification on participants page when meeting has ended.
@@ -163,10 +163,10 @@ public class Notifications
      * @param testId the testId to search for.
      * @return the web element found or null.
      */
-    private WebElement getLobbyNotificationByTestId(String testId)
+    private WebElement getLobbyNotificationByTestId(String testId, String titletestId)
     {
         WebDriver driver = this.participant.getDriver();
-        List<WebElement> lobbyNotifications = driver.findElements(ByTestId.testId(LOBBY_NOTIFICATIONS_TITLE_TEST_ID));
+        List<WebElement> lobbyNotifications = driver.findElements(ByTestId.testId(titletestId));
 
         return lobbyNotifications.stream()
             .filter(webElement -> webElement.findElements(ByTestId.testId(testId)).size() > 0)
@@ -182,31 +182,36 @@ public class Notifications
         WebDriver driver = this.participant.getDriver();
         TestUtils.waitForElementBy(driver, ByTestId.testId(testId), 3);
 
-        WebElement notification = getLobbyNotificationByTestId(testId);
+        WebElement notification = getLobbyNotificationByTestId(testId, LOBBY_NOTIFICATIONS_TITLE_TEST_ID);
 
-        if (notification != null)
-        {
-            try
-            {
-                // wait for the element to be available (notification maybe still animating)
-                TestUtils.waitForCondition(driver, 2, d ->
-                    !notification.findElements(By.tagName("button")).isEmpty());
+        closeLobbyNotification(testId, notification);
+    }
 
-                WebElement closeButton = notification.findElement(By.tagName("button"));
-
-                new Actions(driver).moveToElement(closeButton).click().perform();
-            }
-            catch(StaleElementReferenceException ex)
-            {
-                // retries closing the notification
-                WebElement updatedNotification = getLobbyNotificationByTestId(testId);
-                WebElement closeButton = updatedNotification.findElement(By.tagName("button"));
-                new Actions(driver).moveToElement(closeButton).click().perform();
-            }
-        }
-        else
+    private void closeLobbyNotification(String testId, WebElement notification)
+    {
+        if (notification == null)
         {
             throw new NoSuchElementException("Notification not found:" + testId);
+        }
+
+        WebDriver driver = this.participant.getDriver();
+
+        try
+        {
+            // wait for the element to be available (notification maybe still animating)
+            TestUtils.waitForCondition(driver, 2, d ->
+                    !notification.findElements(By.id("close-notification")).isEmpty());
+
+            WebElement closeButton = notification.findElement(By.id("close-notification"));
+
+            new Actions(driver).moveToElement(closeButton).click().perform();
+        }
+        catch(StaleElementReferenceException ex)
+        {
+            // retries closing the notification
+            WebElement updatedNotification = getLobbyNotificationByTestId(testId, LOBBY_NOTIFICATIONS_TITLE_TEST_ID);
+            WebElement closeButton = updatedNotification.findElement(By.tagName("button"));
+            new Actions(driver).moveToElement(closeButton).click().perform();
         }
     }
 
@@ -242,6 +247,21 @@ public class Notifications
     public void closeLobbyParticipantAccessDenied()
     {
         closeLobbyNotification(LOBBY_PARTICIPANT_ACCESS_DENIED_TEST_ID);
+    }
+
+    /**
+     * Closes local notification, for the participant that was denied.
+     */
+    public void closeLocalLobbyAccessDenied()
+    {
+        String testId = "lobby.joinRejectedMessage";
+
+        WebDriver driver = this.participant.getDriver();
+        TestUtils.waitForElementBy(driver, ByTestId.testId(testId), 3);
+
+        WebElement notification = getLobbyNotificationByTestId(testId, "lobby.joinRejectedTitle");
+
+        closeLobbyNotification(testId, notification);
     }
 
     /**
@@ -440,7 +460,7 @@ public class Notifications
      */
     public void rejectLobbyParticipant(String name)
     {
-        participant.getDriver().findElement(ByTestId.testId(LOBBY_PARTICIPANT_REJECT_TEST_ID)).click();
+        TestUtils.click(participant.getDriver(), ByTestId.testId(LOBBY_PARTICIPANT_REJECT_TEST_ID));
     }
 
     /**
@@ -450,7 +470,7 @@ public class Notifications
      */
     public void allowLobbyParticipant(String name)
     {
-        participant.getDriver().findElement(ByTestId.testId(LOBBY_PARTICIPANT_ADMIT_TEST_ID)).click();
+        TestUtils.click(participant.getDriver(), ByTestId.testId(LOBBY_PARTICIPANT_ADMIT_TEST_ID));
     }
 
     /**

@@ -18,7 +18,6 @@ package org.jitsi.meet.test.pageobjects.web;
 import org.jitsi.meet.test.util.*;
 import org.jitsi.meet.test.web.*;
 import org.openqa.selenium.*;
-import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.interactions.*;
 
 import java.util.*;
@@ -146,9 +145,9 @@ public class BreakoutRoomsList
             WebElement listItem = TestUtils.waitForElementBy(participant.getDriver(),
                     By.xpath("//div[@data-testid='" + id + "']"), 5);
 
-            Actions hoverOnBreakoutRoomListItem = new Actions(participant.getDriver());
-            hoverOnBreakoutRoomListItem.moveToElement(listItem);
-            hoverOnBreakoutRoomListItem.perform();
+            Actions clickOnBreakoutRoomListItem = new Actions(participant.getDriver());
+            clickOnBreakoutRoomListItem.click(listItem);
+            clickOnBreakoutRoomListItem.perform();
 
             WebElement joinButton = TestUtils.waitForElementBy(participant.getDriver(),
                     ByTestId.testId("join-room-" + id), 2);
@@ -161,9 +160,9 @@ public class BreakoutRoomsList
             WebElement listItem = TestUtils.waitForElementBy(participant.getDriver(),
                     By.xpath("//div[@data-testid='" + id + "']"), 5);
 
-            Actions hoverOnBreakoutRoomListItem = new Actions(participant.getDriver());
-            hoverOnBreakoutRoomListItem.moveToElement(listItem);
-            hoverOnBreakoutRoomListItem.perform();
+            Actions clickOnBreakoutRoomListItem = new Actions(participant.getDriver());
+            clickOnBreakoutRoomListItem.click(listItem);
+            clickOnBreakoutRoomListItem.perform();
 
             String cssSelector = MeetUIUtils.getAccessibilityCSSSelector(MORE_LABEL);
             listItem.findElement(By.cssSelector(cssSelector)).click();
@@ -176,6 +175,30 @@ public class BreakoutRoomsList
                     By.id("remove-room-" + id), 2);
 
             removeButton.click();
+        }
+
+        public void renameRoom(String newName)
+        {
+            WebDriver driver = participant.getDriver();
+
+            openContextMenu();
+            WebElement removeButton = TestUtils.waitForElementBy(driver, By.id("rename-room-" + id), 2);
+
+            removeButton.click();
+
+            TestUtils.waitForElementBy(driver, By.xpath("//input[@name='breakoutRoomName']"), 5);
+
+            // give time for the dialog to fully load
+            TestUtils.waitMillis(1000);
+
+            WebElement passwordInput = driver.findElement(By.xpath("//input[@name='breakoutRoomName']"));
+
+            passwordInput.clear();
+            passwordInput.sendKeys(newName);
+
+            TestUtils.waitMillis(500);
+
+            ModalDialogHelper.clickOKButton(driver);
         }
 
         public void closeRoom()
